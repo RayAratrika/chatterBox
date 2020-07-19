@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+
+<head>
+    <title>chatterBox</title>
+    <script src="https://code.jquery.com/jquery-3.4.1.min.js"></script>
+    <style>
+        body {
+            text-align: center;
+            margin-top: 3%;
+            overflow-x: hidden;
+        }
+
+        #typee {
+            margin: -1% auto;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        #users {
+            margin: -1% auto;
+            text-align: right;
+            font-weight: 600;
+        }
+
+        #seeMessage {
+            height: 350px;
+        }
+
+        #messageList {
+            display: block;
+            width: 70%;
+            height: 330px;
+            overflow-y: scroll;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            hyphens: auto;
+            margin-left: 15%;
+            text-align: left;
+            list-style-type: none;
+            border: 1px solid black;
+        }
+
+        #writeForm {
+            display: block;
+            justify-content: center;
+            width: 70%;
+            margin-left: 15%;
+        }
+
+        #sendMessage {
+            bottom: 15px;
+            position: fixed;
+            width: 100%;
+        }
+
+        #writeMessage {
+            border: 1px solid black;
+            padding: 0.4%;
+        }
+
+        #send {
+            width: 8%;
+            padding: 0.4%;
+            margin-left: 4%;
+            height: fit-content;
+        }
+
+        li {
+            width: 100%;
+        }
+
+        .msg {
+            display: inline-block;
+            text-align: left;
+            width: 90%;
+            font-size: 18px;
+        }
+
+        .date {
+            text-align: right;
+            font-size: 12px;
+        }
+
+
+        /* #seeMessage, #sendMessage{
+            display: none;
+        } */
+    </style>
+
+</head>
+
+<body onload="loadTexts()">
+    <p style='font-size: 40px; margin-bottom: 2.7%'>Welcome to
+        <span style='font-size: 48px; font-weight: bold;'>
+            chatterBox
+        </span>
+    </p>
+
+
+    <div style='display: flex; justify-content: space-evenly; width: 70%; margin: auto'>
+        <p id='typee'></p>
+        <p id='users'></p>
+    </div>
+    <div class='messageBox'>
+        <!-- all the texts are shown here -->
+        <div id='seeMessage'>
+            <ul id='messageList'>
+                <!-- all user chats come here as <li> elements -->
+            </ul>
+        </div>
+
+    </div>
+
+    <div id='sendMessage'>
+        <!-- the text area and send button -->
+        <form action='' id='writeForm'>
+            <textarea id='writeMessage' cols='110' rows='2' autofocus></textarea>
+            <button type="submit" id='send' OnClick="document.getElementById('writeMessage').focus();">Send</button>
+        </form>
+
+    </div>
+
+    <script src='/socket.io/socket.io.js'></script>
+    <script>
+
+        //array storing all messages
+        var chatMessages = [];
+
+        //load messages on refresh. --session storage--
+        function loadTexts() {
+            var texts = sessionStorage.getItem('texts');
+            texts = JSON.parse(texts) || [];
+            for (var i = 0; i < texts.length; i++) {
+                chatMessages.push(texts[i]);
+                $('#messageList').append('<li><p><span class="msg">' + texts[i].name + ': ' + texts[i].msg + '</span><span class="date">' + texts[i].time + '</span></p></li>');
+            }
+        }
+
+        $(() => {
+            var socket = io();
+
+            socket.emit('getChatters');
+
+            $('#writeMessage').keydown(() => socket.emit('typing'));
+
+            $('#writeForm').submit(() => {
+                socket.emit('chat message', $('#writeMessage').val());
+                $('#writeMessage').val('');
+                return false;
+            })
+
+            //on room already existing
+            // socket.on('room exists', (room) => alert(room+' already exists. Please try something new to avoid clashing!'));
+
+            //on user joining
+            socket.on('userJoin', (user, chatters) => {
+                alert(user + ' joined the chat!');
+            });
+
+            //on getting chatters
+            socket.on('chatters', (chatters) => {
+                var users = document.getElementById('users');
+                chatters.length === 1 ? users.innerText = chatters.join(', ') + ' is in this chat' : users.innerText = chatters.join(', ') + ' are in this chat';
+            })
+
+            //on typing
+            socket.on('typing', (typee) => {
+                var typer = document.getElementById('typee');
+                typer.innerText = typee + ' is typing...';
+            })
+
+            //on recieving messages
+            socket.on('chat message', (msg, user) => {
+                if (msg === '') alert('no message typed!');
+                const newMessage = {
+                    msg: msg,
+                    name: user,
+                    time: new Date().toLocaleTimeString()
+                }
+
+                $('#messageList').append('<li><p><span class="msg">' + newMessage.name + ': ' + newMessage.msg + '</span><span class="date">' + newMessage.time + '</span></p></li>');
+
+                chatMessages.push(newMessage);
+                sessionStorage.setItem('texts', JSON.stringify(chatMessages));
+            });
+
+            //on disconnecting
+            socket.on('disconnect', (user, chatters) => {
+                alert(user + ' left the chat!')
+            });
+        })
+
+    </script>
+</body>
